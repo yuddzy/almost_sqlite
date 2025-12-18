@@ -1,16 +1,132 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <cstring>
 #include <sstream>
 #include <vector>
 #include <algorithm>
 #include <cctype>
-#include "types.h"
 #include <iostream>
 #include <fstream>
-#include "metadata.h"
-#include "Command.h"
-#include "ValidationError.h"
+#include <memory>
+#include "parser.h"
+#include "../config/config.h"
+#include "../types/types.h"
+#include "../condition/condition.h"
+#include "../typeError/typeError.h"
+#include "../command/Command.h"
 
 using namespace std;
+
+Condition parse_single_where_condition(const std::string& condition) {
+    string cond = condition;
+    cond.erase(0, cond.find_first_not_of(" "));
+    cond.erase(cond.find_last_not_of(" ") + 1);
+
+    // Определяем оператор
+    size_t op_pos = string::npos;
+    string op_str;
+    Operator op = EQUAL;
+
+    // Проверяем операторы в порядке приоритета
+    vector<pair<string, Operator>> operators = {
+        {"!=", NOT_EQUAL},
+        {"<=", LESS_OR_EQUAL},
+        {">=", GREATER_OR_EQUAL},
+        {"=", EQUAL},
+        {"<", LESS},
+        {">", GREATER},
+        {"LIKE", LIKE}
+    };
+
+    for (const auto& op_pair : operators) {
+        size_t pos = cond.find(op_pair.first);
+        if (pos != string::npos) {
+            // Проверяем, что оператор не является частью слова
+            if (pos > 0 && isalnum(cond[pos - 1])) continue;
+            if (pos + op_pair.first.length() < cond.length() &&
+                isalnum(cond[pos + op_pair.first.length()])) continue;
+
+            op_pos = pos;
+            op_str = op_pair.first;
+            op = op_pair.second;
+            break;
+        }
+    }
+
+    if (op_pos == string::npos) {
+        throw typeError(INVALID_SYNTAX, "Неизвестный оператор в условии WHERE: " + condition);
+    }
+
+    string column_name = cond.substr(0, op_pos);
+    string value = cond.substr(op_pos + op_str.length());
+
+    // Убираем пробелы
+    column_name.erase(0, column_name.find_first_not_of(" "));
+    column_name.erase(column_name.find_last_not_of(" ") + 1);
+    value.erase(0, value.find_first_not_of(" "));
+    value.erase(value.find_last_not_of(" ") + 1);
+
+    // Если значение в кавычках, убираем их
+    if (value.size() >= 2 && value[0] == '\'' && value.back() == '\'') {
+        value = value.substr(1, value.length() - 2);
+    }
+
+    // Определяем тип значения и создаем указатель
+    All_types value_type = All_types::VARCHAR;
+    void* compare_value = nullptr;
+
+    if (value.empty()) {
+        value_type = All_types::VARCHAR;
+        compare_value = malloc(1);
+        static_cast<char*>(compare_value)[0] = '\0';
+    }
+    else if (value == "NULL") {
+        value_type = All_types::INT_TYPE;
+        compare_value = nullptr;
+    }
+    else {
+        // Для простоты сохраняем как строку
+        value_type = All_types::VARCHAR;
+        compare_value = malloc(value.length() + 1);
+        strcpy(static_cast<char*>(compare_value), value.c_str());
+    }
+
+    return create_condition(column_name, op, value_type, compare_value);
+}
+
+// Функция для парсинга нескольких условий WHERE
+vector<Condition> parse_where_conditions(const string& where_str) {
+    vector<Condition> conditions;
+
+    string upper_where = where_str;
+    transform(upper_where.begin(), upper_where.end(), upper_where.begin(), ::toupper);
+
+    size_t start = 0;
+    size_t and_pos;
+
+    do {
+        and_pos = upper_where.find(" AND ", start);
+
+        string condition;
+        if (and_pos != string::npos) {
+            condition = where_str.substr(start, and_pos - start);
+            start = and_pos + 5;
+        }
+        else {
+            condition = where_str.substr(start);
+        }
+
+        // Убираем пробелы
+        condition.erase(0, condition.find_first_not_of(" "));
+        condition.erase(condition.find_last_not_of(" ") + 1);
+
+        if (!condition.empty()) {
+            conditions.push_back(parse_single_where_condition(condition));
+        }
+
+    } while (and_pos != string::npos);
+
+    return conditions;
+}
 
 //функция возвращает тип команды
 int parse_command(const string& command) {
@@ -56,7 +172,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
         size_t paren_start = command.find("(");
 
         if (table_start == string::npos || paren_start == string::npos) {
-            throw ValidationError(INVALID_SYNTAX, "Неверный синтаксис CREATE TABLE");
+            throw typeError(INVALID_SYNTAX, "Неверный синтаксис CREATE TABLE");
         }
 
         table_name = command.substr(table_start, paren_start - table_start);
@@ -64,7 +180,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
         table_name.erase(table_name.find_last_not_of(" ") + 1);
 
         if (table_name.empty()) {
-            throw ValidationError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
+            throw typeError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
         }
 
         string columns_part = command.substr(paren_start + 1, command.find_last_of(")") - paren_start - 1);
@@ -83,7 +199,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
 
             size_t first_space = column_definition.find(" ");
             if (first_space == string::npos) {
-                throw ValidationError(INVALID_SYNTAX, "Неверное определение колонки: " + column_definition);
+                throw typeError(INVALID_SYNTAX, "Неверное определение колонки: " + column_definition);
             }
 
             string column_name = column_definition.substr(0, first_space);
@@ -93,7 +209,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
             column_type_str.erase(column_type_str.find_last_not_of(" ") + 1);
 
             if (find(parsed_column_names.begin(), parsed_column_names.end(), column_name) != parsed_column_names.end()) {
-                throw ValidationError(INVALID_SYNTAX, "Дублирующееся имя колонки: " + column_name);
+                throw typeError(INVALID_SYNTAX, "Дублирующееся имя колонки: " + column_name);
             }
             parsed_column_names.push_back(column_name);
 
@@ -110,7 +226,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
                         size = stoi(size_str);
                     }
                     catch (const exception&) {
-                        throw ValidationError(INVALID_SYNTAX, "Неверный размер для колонки: " + column_name);
+                        throw typeError(INVALID_SYNTAX, "Неверный размер для колонки: " + column_name);
                     }
                 }
             }
@@ -118,7 +234,7 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
             All_types column_type_id = get_type_from_string(base_type);
 
             if (column_type_id == All_types::VARCHAR && size <= 0) {
-                throw ValidationError(INVALID_SYNTAX, "VARCHAR должен иметь размер для колонки " + column_name);
+                throw typeError(INVALID_SYNTAX, "VARCHAR должен иметь размер для колонки " + column_name);
             }
 
             if (column_type_id == All_types::CHAR_TYPE && size <= 0) {
@@ -127,19 +243,19 @@ unique_ptr<CreateCommand> parse_create_table_query(const string& command) {
 
             column_names.push_back(column_name);
             data_types.push_back(column_type_str);
-            is_nullable.push_back(true); 
+            is_nullable.push_back(true);
         }
 
         if (column_names.empty()) {
-            throw ValidationError(INVALID_SYNTAX, "Таблица должна иметь хотя бы одну колонку");
+            throw typeError(INVALID_SYNTAX, "Таблица должна иметь хотя бы одну колонку");
         }
 
     }
-    catch (const ValidationError&) {
+    catch (const typeError&) {
         throw;
     }
     catch (const exception& e) {
-        throw ValidationError(INVALID_SYNTAX, "Ошибка парсинга CREATE TABLE: " + string(e.what()));
+        throw typeError(INVALID_SYNTAX, "Ошибка парсинга CREATE TABLE: " + string(e.what()));
     }
 
     return make_unique<CreateCommand>(table_name, column_names, data_types, is_nullable);
@@ -152,12 +268,12 @@ unique_ptr<SelectCommand> parse_select_query(const string& command) {
 
     size_t select_pos = upper_command.find("SELECT");
     if (select_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует SELECT в запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует SELECT в запросе");
     }
 
     size_t from_pos = upper_command.find("FROM");
     if (from_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует FROM в SELECT запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует FROM в SELECT запросе");
     }
 
     // Извлекаем список колонок
@@ -167,7 +283,7 @@ unique_ptr<SelectCommand> parse_select_query(const string& command) {
 
     // Проверяем, что есть колонки
     if (columns_str.empty()) {
-        throw ValidationError(INVALID_SYNTAX, "SELECT должен содержать список колонок или *");
+        throw typeError(INVALID_SYNTAX, "SELECT должен содержать список колонок или *");
     }
 
     vector<string> columns;
@@ -206,12 +322,12 @@ unique_ptr<SelectCommand> parse_select_query(const string& command) {
     table_name.erase(table_name.find_last_not_of(" \t;") + 1);
 
     if (table_name.empty()) {
-        throw ValidationError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
+        throw typeError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
     }
 
-    vector<string> where_conditions;
-    vector<string> order_by;
-    int limit = -1;
+    vector<Condition> where_conditions;
+    //vector<string> order_by;               
+    //int limit = -1;
 
     // Парсим WHERE если есть
     if (where_pos_global != string::npos) {
@@ -231,11 +347,11 @@ unique_ptr<SelectCommand> parse_select_query(const string& command) {
         where_clause.erase(where_clause.find_last_not_of(" \t") + 1);
 
         if (!where_clause.empty()) {
-            where_conditions.push_back(where_clause);
+            where_conditions = parse_where_conditions(where_clause);
         }
     }
 
-    return make_unique<SelectCommand>(columns, table_name, where_conditions, order_by, limit);
+    return make_unique<SelectCommand>(columns, table_name, where_conditions);
 }
 
 // Функция для создания InsertCommand
@@ -245,12 +361,12 @@ unique_ptr<InsertCommand> parse_insert_query(const string& command) {
 
     size_t into_pos = upper_command.find("INTO");
     if (into_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует INTO в INSERT запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует INTO в INSERT запросе");
     }
 
     size_t values_pos = upper_command.find("VALUES");
     if (values_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует VALUES в INSERT запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует VALUES в INSERT запросе");
     }
 
     string table_part = command.substr(into_pos + 4, values_pos - (into_pos + 4));
@@ -269,7 +385,7 @@ unique_ptr<InsertCommand> parse_insert_query(const string& command) {
 
         size_t paren_close = table_part.find(")");
         if (paren_close == string::npos) {
-            throw ValidationError(INVALID_SYNTAX, "Незакрытые скобки в списке колонок INSERT");
+            throw typeError(INVALID_SYNTAX, "Незакрытые скобки в списке колонок INSERT");
         }
 
         string columns_str = table_part.substr(paren_open + 1, paren_close - paren_open - 1);
@@ -288,7 +404,7 @@ unique_ptr<InsertCommand> parse_insert_query(const string& command) {
     }
 
     if (table_name.empty()) {
-        throw ValidationError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
+        throw typeError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
     }
 
     // Парсим значения
@@ -298,7 +414,7 @@ unique_ptr<InsertCommand> parse_insert_query(const string& command) {
     size_t values_start = values_part.find("(");
     size_t values_end = values_part.find(")");
     if (values_start == string::npos || values_end == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Неверный формат значений в INSERT");
+        throw typeError(INVALID_SYNTAX, "Неверный формат значений в INSERT");
     }
 
     string values_str = values_part.substr(values_start + 1, values_end - values_start - 1);
@@ -330,15 +446,15 @@ unique_ptr<UpdateCommand> parse_update_query(const string& command) {
 
     size_t set_pos = upper_command.find("SET");
     if (set_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует SET в UPDATE запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует SET в UPDATE запросе");
     }
 
-    string table_name = command.substr(6, set_pos - 6); 
+    string table_name = command.substr(6, set_pos - 6);
     table_name.erase(0, table_name.find_first_not_of(" "));
     table_name.erase(table_name.find_last_not_of(" ") + 1);
 
     if (table_name.empty()) {
-        throw ValidationError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
+        throw typeError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
     }
 
     string set_part;
@@ -352,9 +468,8 @@ unique_ptr<UpdateCommand> parse_update_query(const string& command) {
     }
 
     vector<pair<string, string>> set_clauses;
-    vector<string> where_conditions;
+    vector<Condition> where_conditions;
 
-    // Парсим SET clauses
     stringstream ss_set(set_part);
     string assignment;
     while (getline(ss_set, assignment, ',')) {
@@ -376,7 +491,11 @@ unique_ptr<UpdateCommand> parse_update_query(const string& command) {
     if (where_pos != string::npos) {
         string where_part = command.substr(where_pos + 5);
         where_part.erase(0, where_part.find_first_not_of(" "));
-        where_conditions.push_back(where_part);
+        where_part.erase(where_part.find_last_not_of(" \t;") + 1);
+
+        if (!where_part.empty()) {
+            where_conditions = parse_where_conditions(where_part);
+        }
     }
 
     return make_unique<UpdateCommand>(table_name, set_clauses, where_conditions);
@@ -389,7 +508,7 @@ unique_ptr<DeleteCommand> parse_delete_query(const string& command) {
 
     size_t from_pos = upper_command.find("FROM");
     if (from_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует FROM в DELETE запросе");
+        throw typeError(INVALID_SYNTAX, "Отсутствует FROM в DELETE запросе");
     }
 
     // Извлекаем часть после FROM
@@ -397,7 +516,7 @@ unique_ptr<DeleteCommand> parse_delete_query(const string& command) {
     after_from.erase(0, after_from.find_first_not_of(" "));
 
     string table_name;
-    vector<string> where_conditions;
+    vector<Condition> where_conditions;
 
     size_t where_pos = upper_command.find("WHERE", from_pos + 4);
 
@@ -411,20 +530,23 @@ unique_ptr<DeleteCommand> parse_delete_query(const string& command) {
         string where_part = command.substr(where_pos + 5);
         where_part.erase(0, where_part.find_first_not_of(" "));
         where_part.erase(where_part.find_last_not_of(" \t;") + 1);
-        where_conditions.push_back(where_part);
+
+        if (!where_part.empty()) {
+            //используем новую функцию парсинга
+            where_conditions = parse_where_conditions(where_part);
+        }
     }
     else {
         // Нет WHERE
         table_name = after_from;
         table_name.erase(table_name.find_last_not_of(" \t;") + 1);
     }
-
     // Очищаем имя таблицы от пробелов
     table_name.erase(0, table_name.find_first_not_of(" "));
     table_name.erase(table_name.find_last_not_of(" \t") + 1);
 
     if (table_name.empty()) {
-        throw ValidationError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
+        throw typeError(INVALID_SYNTAX, "Имя таблицы не может быть пустым");
     }
 
     return make_unique<DeleteCommand>(table_name, where_conditions);
@@ -439,14 +561,14 @@ unique_ptr<AlterCommand> parse_alter_query(const string& command) {
     while (pos < upper_command.length() && isspace(upper_command[pos])) ++pos;
 
     if (upper_command.substr(pos, 5) != "ALTER") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'ALTER' в запросе: " + command);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'ALTER' в запросе: " + command);
     }
     pos += 5;
 
     while (pos < upper_command.length() && isspace(upper_command[pos])) ++pos;
 
     if (upper_command.substr(pos, 5) != "TABLE") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'TABLE' в ALTER запросе: " + command);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'TABLE' в ALTER запросе: " + command);
     }
     pos += 5;
 
@@ -459,7 +581,7 @@ unique_ptr<AlterCommand> parse_alter_query(const string& command) {
     }
 
     if (table_start == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в ALTER запросе: " + command);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в ALTER запросе: " + command);
     }
 
     string table_name = command.substr(table_start, pos - table_start);
@@ -511,7 +633,7 @@ unique_ptr<AlterCommand> parse_alter_query(const string& command) {
         column_name = command.substr(column_start, pos - column_start);
     }
     else {
-        throw ValidationError(INVALID_SYNTAX, "Неизвестная операция в ALTER запросе: " + command);
+        throw typeError(INVALID_SYNTAX, "Неизвестная операция в ALTER запросе: " + command);
     }
 
     return make_unique<AlterCommand>(table_name, operation_type, column_name, data_type, "", true);
@@ -522,25 +644,24 @@ unique_ptr<Command> parse_sql_command(const string& command) {
     int command_type = parse_command(command);
 
     switch (command_type) {
-    case 0: 
+    case 0:
         return parse_create_table_query(command);
-    case 1: 
+    case 1:
         return parse_select_query(command);
-    case 2: 
+    case 2:
         return parse_update_query(command);
-    case 3: 
+    case 3:
         return parse_delete_query(command);
-    case 4: 
+    case 4:
         return parse_insert_query(command);
-    case 5: 
+    case 5:
         return parse_alter_query(command);
     default:
-        throw ValidationError(INVALID_SYNTAX, "Неизвестная или неподдерживаемая команда: " + command);
+        throw typeError(INVALID_SYNTAX, "Неизвестная или неподдерживаемая команда: " + command);
     }
 }
 
-// Старая функция main для тестирования
-int main3() {
+int main() {
     string command;
 
     while (true) {
@@ -562,7 +683,7 @@ int main3() {
             // Здесь можно вызвать 
 
         }
-        catch (const ValidationError& e) {
+        catch (const typeError& e) {
             cout << "Ошибка валидации: " << e.what() << endl;
         }
         catch (const exception& e) {

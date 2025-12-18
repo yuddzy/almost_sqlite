@@ -1,7 +1,9 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include "metadata.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <cstring>
 
 using namespace std;
 
@@ -13,15 +15,14 @@ void serialize_metadata(const string& table_name, const vector<Column>& columns,
         return;
     }
 
-    TableMetadataHeader header = {};
-
+    TableMetadataHeader header;
     string signature_str = "ALMOST_SQLITE_V1";
-    memset(header.signature, 0, sizeof(header.signature));
-    signature_str.copy(header.signature, signature_str.length());
+    strncpy(header.signature, signature_str.c_str(), sizeof(header.signature) - 1);
+    header.signature[sizeof(header.signature) - 1] = '\0';
 
     header.version = 1;
     header.column_count = static_cast<uint32_t>(columns.size());
-    header.created_time = time(nullptr);
+    header.created_time = static_cast<uint64_t>(time(nullptr));
     header.record_count = record_count;
     header.data_file_size = 0;
     header.flags = 0;
@@ -30,14 +31,10 @@ void serialize_metadata(const string& table_name, const vector<Column>& columns,
 
     uint16_t current_offset = 0;
     for (const auto& column : columns) {
-        ColumnMetadata col_meta = {};
+        ColumnMetadata col_meta;
 
-        memset(col_meta.name, 0, sizeof(col_meta.name));
-        string column_name = column.name;
-        if (column_name.length() >= sizeof(col_meta.name)) {
-            column_name = column_name.substr(0, sizeof(col_meta.name) - 1);
-        }
-        column_name.copy(col_meta.name, column_name.length());
+        strncpy(col_meta.name, column.name.c_str(), sizeof(col_meta.name) - 1);
+        col_meta.name[sizeof(col_meta.name) - 1] = '\0';
 
         col_meta.type = column.type;
         col_meta.size = static_cast<uint32_t>(column.size);
@@ -84,10 +81,7 @@ bool deserialize_metadata(const string& table_name, vector<Column>& columns, uin
         ColumnMetadata col_meta;
         meta_file.read(reinterpret_cast<char*>(&col_meta), sizeof(col_meta));
 
-        Column column;
-        column.name = string(col_meta.name);
-        column.type = col_meta.type;
-        column.size = static_cast<int>(col_meta.size);
+        Column column(string(col_meta.name), col_meta.type, static_cast<int>(col_meta.size));
 
         columns.push_back(column);
     }

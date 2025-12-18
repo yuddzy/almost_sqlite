@@ -1,12 +1,10 @@
 #pragma once
-#include "types.h"
 #include <ctime>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <vector>
-
-#pragma pack(push, 1)
+#include "../types/types.h"
 
 struct TableMetadataHeader {
     char signature[16];
@@ -17,6 +15,11 @@ struct TableMetadataHeader {
     uint32_t data_file_size;
     uint16_t flags;
     char reserved[14];
+
+    TableMetadataHeader() {
+        memset(signature, 0, sizeof(signature));
+        memset(reserved, 0, sizeof(reserved));
+    }
 };
 
 struct ColumnMetadata {
@@ -26,9 +29,12 @@ struct ColumnMetadata {
     uint16_t offset;
     uint8_t flags;
     char reserved[7];
-};
 
-#pragma pack(pop)
+    ColumnMetadata() {
+        memset(name, 0, sizeof(name));
+        memset(reserved, 0, sizeof(reserved));
+    }
+};
 
 void serialize_metadata(const std::string& table_name, const std::vector<Column>& columns, uint64_t record_count);
 bool deserialize_metadata(const std::string& table_name, std::vector<Column>& columns, uint64_t& record_count);

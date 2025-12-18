@@ -19,31 +19,33 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Command.cpp" />
-    <ClCompile Include="src\Constraint_table.cpp" />
-    <ClCompile Include="src\db.cpp" />
-    <ClCompile Include="src\metadata.cpp" />
-    <ClCompile Include="src\parser.cpp" />
-    <ClCompile Include="src\Process_file.cpp" />
-    <ClCompile Include="src\service_table.c" />
-    <ClCompile Include="src\service_table.cpp" />
-    <ClCompile Include="src\test_integration.cpp" />
-    <ClCompile Include="src\test_types.cpp" />
-    <ClCompile Include="src\types.cpp" />
-    <ClCompile Include="src\ValidationError.cpp" />
+    <ClCompile Include="src\command\Command.cpp" />
+    <ClCompile Include="src\command\test_integration.cpp" />
+    <ClCompile Include="src\logs\example.cpp" />
+    <ClCompile Include="src\logs\wal_simple.cpp" />
+    <ClCompile Include="src\metadata\metadata.cpp" />
+    <ClCompile Include="src\parse\parser.cpp" />
+    <ClCompile Include="src\schemas\db.cpp" />
+    <ClCompile Include="src\schemas\Process_file.cpp" />
+    <ClCompile Include="src\ser\Constraint_table.cpp" />
+    <ClCompile Include="src\ser\service_table.cpp" />
+    <ClCompile Include="src\typeError\typeError.cpp" />
+    <ClCompile Include="src\types\test_types.cpp" />
+    <ClCompile Include="src\types\types.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Command.h" />
-    <ClInclude Include="src\db.h" />
-    <ClInclude Include="src\metadata.h" />
-    <ClInclude Include="src\parser.h" />
-    <ClInclude Include="src\serializer.h" />
-    <ClInclude Include="src\types.h" />
-    <ClInclude Include="src\ValidationError.h" />
-    <ClInclude Include="src\validator.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="run_test.bat" />
+    <ClInclude Include="src\command\Command.h" />
+    <ClInclude Include="src\command\db.h" />
+    <ClInclude Include="src\condition\condition.h" />
+    <ClInclude Include="src\config\config.h" />
+    <ClInclude Include="src\logs\wal_simple.h" />
+    <ClInclude Include="src\metadata\metadata.h" />
+    <ClInclude Include="src\parse\parser.h" />
+    <ClInclude Include="src\typeError\typeError.h" />
+    <ClInclude Include="src\types\tests\serializer.h" />
+    <ClInclude Include="src\types\tests\validator.h" />
+    <ClInclude Include="src\types\test_types.h" />
+    <ClInclude Include="src\types\types.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -143,6 +145,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>src;src/types;src/types/tests;src/metadata;src/parse;src/command;src/error;src/logs;src/ser;src/schemas</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

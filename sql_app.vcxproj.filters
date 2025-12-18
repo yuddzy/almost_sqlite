@@ -13,48 +13,117 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Исходные файлы\command">
+      <UniqueIdentifier>{bb8e0738-8d97-4750-8ae5-892acff2f93d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\logs">
+      <UniqueIdentifier>{f83f6751-a7f5-4ea3-b823-9a7722543b54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\metadata">
+      <UniqueIdentifier>{1673e84f-ed56-40c9-84bd-eee0e8aa6709}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\parse">
+      <UniqueIdentifier>{5ca903b0-30c6-4e83-8824-e338d14c94f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\schemas">
+      <UniqueIdentifier>{b3ae849c-f3c1-49c4-82c5-6dd8541f3d77}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\ser">
+      <UniqueIdentifier>{af43171a-0fb0-4479-95ff-edc986b878e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\types">
+      <UniqueIdentifier>{800296aa-9a35-4fd7-be65-14722fc919fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\types\tests">
+      <UniqueIdentifier>{7672fd2d-663d-4c09-81e9-85735648f93e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\config">
+      <UniqueIdentifier>{7b084196-bdd4-4038-bbf7-b5dbe414ce75}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\condition">
+      <UniqueIdentifier>{594226e9-9360-4585-8518-bf8a1ad73686}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\typeError">
+      <UniqueIdentifier>{57fadeb0-9897-4820-b6e0-612bc037f04b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Constraint_table.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\logs\example.cpp">
+      <Filter>Исходные файлы\logs</Filter>
     </ClCompile>
-    <ClCompile Include="src\db.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\logs\wal_simple.cpp">
+      <Filter>Исходные файлы\logs</Filter>
     </ClCompile>
-    <ClCompile Include="src\metadata.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\command\test_integration.cpp">
+      <Filter>Исходные файлы\command</Filter>
     </ClCompile>
-    <ClCompile Include="src\parser.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\command\Command.cpp">
+      <Filter>Исходные файлы\command</Filter>
     </ClCompile>
-    <ClCompile Include="src\Process_file.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\metadata\metadata.cpp">
+      <Filter>Исходные файлы\metadata</Filter>
     </ClCompile>
-    <ClCompile Include="src\service_table.c">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\parse\parser.cpp">
+      <Filter>Исходные файлы\parse</Filter>
     </ClCompile>
-    <ClCompile Include="src\test_types.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\schemas\Process_file.cpp">
+      <Filter>Исходные файлы\schemas</Filter>
     </ClCompile>
-    <ClCompile Include="src\types.cpp">
-      <Filter>Исходные файлы</Filter>
+    <ClCompile Include="src\schemas\db.cpp">
+      <Filter>Исходные файлы\schemas</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ser\service_table.cpp">
+      <Filter>Исходные файлы\ser</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ser\Constraint_table.cpp">
+      <Filter>Исходные файлы\ser</Filter>
+    </ClCompile>
+    <ClCompile Include="src\types\types.cpp">
+      <Filter>Исходные файлы\types</Filter>
+    </ClCompile>
+    <ClCompile Include="src\types\test_types.cpp">
+      <Filter>Исходные файлы\types</Filter>
+    </ClCompile>
+    <ClCompile Include="src\typeError\typeError.cpp">
+      <Filter>Исходные файлы\typeError</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\metadata.h">
-      <Filter>Исходные файлы</Filter>
+    <ClInclude Include="src\logs\wal_simple.h">
+      <Filter>Исходные файлы\logs</Filter>
     </ClInclude>
-    <ClInclude Include="src\parser.h">
-      <Filter>Исходные файлы</Filter>
+    <ClInclude Include="src\command\Command.h">
+      <Filter>Исходные файлы\command</Filter>
     </ClInclude>
-    <ClInclude Include="src\serializer.h">
-      <Filter>Исходные файлы</Filter>
+    <ClInclude Include="src\command\db.h">
+      <Filter>Исходные файлы\command</Filter>
     </ClInclude>
-    <ClInclude Include="src\types.h">
-      <Filter>Исходные файлы</Filter>
+    <ClInclude Include="src\metadata\metadata.h">
+      <Filter>Исходные файлы\metadata</Filter>
     </ClInclude>
-    <ClInclude Include="src\validator.h">
-      <Filter>Исходные файлы</Filter>
+    <ClInclude Include="src\parse\parser.h">
+      <Filter>Исходные файлы\parse</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types\test_types.h">
+      <Filter>Исходные файлы\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types\types.h">
+      <Filter>Исходные файлы\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types\tests\validator.h">
+      <Filter>Исходные файлы\types\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\types\tests\serializer.h">
+      <Filter>Исходные файлы\types\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="src\config\config.h">
+      <Filter>Исходные файлы\config</Filter>
+    </ClInclude>
+    <ClInclude Include="src\typeError\typeError.h">
+      <Filter>Исходные файлы\typeError</Filter>
+    </ClInclude>
+    <ClInclude Include="src\condition\condition.h">
+      <Filter>Исходные файлы\condition</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,3 +1,4 @@
+#define _CRT_SECURE_NO_WARNINGS
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -5,18 +6,12 @@
 #include <map>
 #include <algorithm>
 #include <cctype>
-#include <memory>
-#include "types.h"
-#include "metadata.h"
-#include "Command.h"
-#include "ValidationError.h"
+#include "config/config.h"
+#include "parser.h"
 
 using namespace std;
 
-class Metadata {
-};
-
-unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_create(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -26,7 +21,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
     }
 
     if (query_upper.substr(pos, 11) != "CREATE TABLE") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'CREATE TABLE' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'CREATE TABLE' в запросе: " + query);
     }
     pos += 11;
 
@@ -39,7 +34,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
         ++pos;
     }
     if (start_table == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в CREATE TABLE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в CREATE TABLE запросе: " + query);
     }
     string table_name = query.substr(start_table, pos - start_table);
 
@@ -48,7 +43,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
     }
 
     if (pos >= query_upper.length() || query_upper[pos] != '(') {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается '(' после имени таблицы в CREATE TABLE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается '(' после имени таблицы в CREATE TABLE запросе: " + query);
     }
     ++pos;
 
@@ -91,7 +86,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
         }
 
         if (!name_found || !type_found) {
-            throw ValidationError(INVALID_SYNTAX, "Неверное определение колонки в CREATE TABLE: " + token);
+            throw typeError(INVALID_SYNTAX, "Неверное определение колонки в CREATE TABLE: " + token);
         }
 
         column_names.push_back(col_name);
@@ -159,7 +154,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
     }
 
     if (paren_count != 0) {
-        throw ValidationError(INVALID_SYNTAX, "Непарные скобки в списке определений колонок CREATE TABLE запроса: " + query);
+        throw typeError(INVALID_SYNTAX, "Непарные скобки в списке определений колонок CREATE TABLE запроса: " + query);
     }
 
     while (pos < query.length() && isspace(query[pos])) {
@@ -169,7 +164,7 @@ unique_ptr<Command> parse_create(const string& query, Metadata& metadata) {
     return make_unique<CreateCommand>(table_name, column_names, data_types, is_nullable);
 }
 
-unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_select(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -177,7 +172,7 @@ unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 6) != "SELECT") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'SELECT' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'SELECT' в запросе: " + query);
     }
     pos += 6;
 
@@ -186,7 +181,7 @@ unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
     vector<string> columns;
     size_t from_pos = query_upper.find("FROM", pos);
     if (from_pos == string::npos) {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'FROM' в SELECT запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'FROM' в SELECT запросе: " + query);
     }
 
     string columns_str = query.substr(pos, from_pos - pos);
@@ -215,9 +210,9 @@ unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
     string table_name = query.substr(pos, table_end - pos);
     pos = table_end;
 
-    vector<string> where_conditions;
-    vector<string> order_by;
-    int limit = -1;
+    vector<Condition> where_conditions;
+    // vector<string> order_by; // Временно закомментировано
+    // int limit = -1; // Временно закомментировано
 
     size_t where_pos = query_upper.find("WHERE", pos);
     if (where_pos != string::npos) {
@@ -225,17 +220,19 @@ unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
         while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
         size_t where_end = query_upper.length();
-        size_t order_pos = query_upper.find("ORDER BY", pos);
-        size_t limit_pos = query_upper.find("LIMIT", pos);
+        // size_t order_pos = query_upper.find("ORDER BY", pos); // Временно закомментировано
+        // size_t limit_pos = query_upper.find("LIMIT", pos); // Временно закомментировано
 
-        if (order_pos != string::npos) where_end = min(where_end, order_pos);
-        if (limit_pos != string::npos) where_end = min(where_end, limit_pos);
+        // if (order_pos != string::npos) where_end = min(where_end, order_pos); // Временно закомментировано
+        // if (limit_pos != string::npos) where_end = min(where_end, limit_pos); // Временно закомментировано
 
         string where_clause = query.substr(pos, where_end - pos);
-        where_conditions.push_back(where_clause);
+        where_conditions = parse_where_conditions(where_clause);
         pos = where_end;
     }
 
+    // Временно закомментирован код для ORDER BY и LIMIT
+    /*
     size_t order_pos = query_upper.find("ORDER BY", pos);
     if (order_pos != string::npos) {
         pos = order_pos + 8;
@@ -263,14 +260,16 @@ unique_ptr<Command> parse_select(const string& query, Metadata& metadata) {
             limit = stoi(limit_str);
         }
         catch (const exception&) {
-            throw ValidationError(INVALID_SYNTAX, "Неверный формат LIMIT в SELECT запросе: " + query);
+            throw typeError(INVALID_SYNTAX, "Неверный формат LIMIT в SELECT запросе: " + query);
         }
     }
+    */
 
-    return make_unique<SelectCommand>(columns, table_name, where_conditions, order_by, limit);
+    // Создаем SelectCommand только с 3 аргументами
+    return make_unique<SelectCommand>(columns, table_name, where_conditions);
 }
 
-unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_insert(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -278,7 +277,7 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 6) != "INSERT") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'INSERT' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'INSERT' в запросе: " + query);
     }
     pos += 6;
 
@@ -295,7 +294,7 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
     }
 
     if (table_start == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в INSERT запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в INSERT запросе: " + query);
     }
 
     string table_name = query.substr(table_start, pos - table_start);
@@ -312,7 +311,7 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
         }
 
         if (pos >= query.length()) {
-            throw ValidationError(INVALID_SYNTAX, "Незакрытый список колонок в INSERT запросе: " + query);
+            throw typeError(INVALID_SYNTAX, "Незакрытый список колонок в INSERT запросе: " + query);
         }
 
         string columns_str = query.substr(column_start, pos - column_start);
@@ -332,7 +331,7 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 6) != "VALUES") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'VALUES' в INSERT запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'VALUES' в INSERT запросе: " + query);
     }
     pos += 6;
 
@@ -348,7 +347,7 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
         }
 
         if (pos >= query.length()) {
-            throw ValidationError(INVALID_SYNTAX, "Незакрытый список значений в INSERT запросе: " + query);
+            throw typeError(INVALID_SYNTAX, "Незакрытый список значений в INSERT запросе: " + query);
         }
 
         string values_str = query.substr(values_start, pos - values_start);
@@ -391,13 +390,13 @@ unique_ptr<Command> parse_insert(const string& query, Metadata& metadata) {
         values.push_back(row_values);
     }
     else {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается список значений в INSERT запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается список значений в INSERT запросе: " + query);
     }
 
     return make_unique<InsertCommand>(table_name, column_names, values);
 }
 
-unique_ptr<Command> parse_update(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_update(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -405,7 +404,7 @@ unique_ptr<Command> parse_update(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 6) != "UPDATE") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'UPDATE' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'UPDATE' в запросе: " + query);
     }
     pos += 6;
 
@@ -417,7 +416,7 @@ unique_ptr<Command> parse_update(const string& query, Metadata& metadata) {
     }
 
     if (table_start == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в UPDATE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в UPDATE запросе: " + query);
     }
 
     string table_name = query.substr(table_start, pos - table_start);
@@ -425,7 +424,7 @@ unique_ptr<Command> parse_update(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 3) != "SET") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'SET' в UPDATE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'SET' в UPDATE запросе: " + query);
     }
     pos += 3;
 
@@ -464,19 +463,20 @@ unique_ptr<Command> parse_update(const string& query, Metadata& metadata) {
         }
     }
 
-    vector<string> where_conditions;
+    vector<Condition> where_conditions;
     if (where_pos != string::npos) {
         pos = where_pos + 5;
         while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
         string where_clause = query.substr(pos);
-        where_conditions.push_back(where_clause);
+        // Используем функцию parse_where_conditions из parser.h
+        where_conditions = parse_where_conditions(where_clause);
     }
 
     return make_unique<UpdateCommand>(table_name, set_clauses, where_conditions);
 }
 
-unique_ptr<Command> parse_delete(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_delete(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -484,14 +484,14 @@ unique_ptr<Command> parse_delete(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 6) != "DELETE") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'DELETE' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'DELETE' в запросе: " + query);
     }
     pos += 6;
 
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 4) != "FROM") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'FROM' в DELETE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'FROM' в DELETE запросе: " + query);
     }
     pos += 4;
 
@@ -503,25 +503,26 @@ unique_ptr<Command> parse_delete(const string& query, Metadata& metadata) {
     }
 
     if (table_start == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в DELETE запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в DELETE запросе: " + query);
     }
 
     string table_name = query.substr(table_start, pos - table_start);
 
-    vector<string> where_conditions;
+    vector<Condition> where_conditions;
     size_t where_pos = query_upper.find("WHERE", pos);
     if (where_pos != string::npos) {
         pos = where_pos + 5;
         while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
         string where_clause = query.substr(pos);
-        where_conditions.push_back(where_clause);
+        // Используем функцию parse_where_conditions из parser.h
+        where_conditions = parse_where_conditions(where_clause);
     }
 
     return make_unique<DeleteCommand>(table_name, where_conditions);
 }
 
-unique_ptr<Command> parse_alter(const string& query, Metadata& metadata) {
+unique_ptr<Command> parse_alter(const string& query) {
     string query_upper = query;
     transform(query_upper.begin(), query_upper.end(), query_upper.begin(), ::toupper);
 
@@ -529,14 +530,14 @@ unique_ptr<Command> parse_alter(const string& query, Metadata& metadata) {
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 5) != "ALTER") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'ALTER' в запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'ALTER' в запросе: " + query);
     }
     pos += 5;
 
     while (pos < query_upper.length() && isspace(query_upper[pos])) ++pos;
 
     if (query_upper.substr(pos, 5) != "TABLE") {
-        throw ValidationError(INVALID_SYNTAX, "Ожидается 'TABLE' в ALTER запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Ожидается 'TABLE' в ALTER запросе: " + query);
     }
     pos += 5;
 
@@ -548,7 +549,7 @@ unique_ptr<Command> parse_alter(const string& query, Metadata& metadata) {
     }
 
     if (table_start == pos) {
-        throw ValidationError(INVALID_SYNTAX, "Отсутствует имя таблицы в ALTER запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Отсутствует имя таблицы в ALTER запросе: " + query);
     }
 
     string table_name = query.substr(table_start, pos - table_start);
@@ -585,7 +586,7 @@ unique_ptr<Command> parse_alter(const string& query, Metadata& metadata) {
         column_name = query.substr(column_start, pos - column_start);
     }
     else {
-        throw ValidationError(INVALID_SYNTAX, "Неизвестная операция в ALTER запросе: " + query);
+        throw typeError(INVALID_SYNTAX, "Неизвестная операция в ALTER запросе: " + query);
     }
 
     return make_unique<AlterCommand>(table_name, operation_type, column_name, data_type, constraint, nullable);
